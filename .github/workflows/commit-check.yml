@@ -11,18 +11,16 @@ jobs:
 
       - name: Validate commit messages
         run: |
-          # Паттерн для первой строки
-          HEADER_PATTERN='^(chore|docs|feat|fix|refactor|revert|style|test)(\([a-z-]+\))?: [a-zA-Z].+'
-          # Паттерн для последней строки
-          FOOTER_PATTERN='Fixes: [A-Z]+-[0-9]+$'
+          HEADER_PATTERN='^(chore|docs|feat|fix|refactor|revert|style|test)(\([a-z-]+\))?: .+'
+          FOOTER_PATTERN='^Fixes: [A-Z]+-[0-9]+$'
           
           ERROR_MSG="❌ Неверный формат коммита! Требования:\n\
           1. Первая строка: <тип>(<область>): <описание>\n\
              Пример: 'fix: исправить баг' или 'feat(api): добавить метод'\n\
+             Допускается: 'fix: fix typo'\n\
           2. Последняя строка: 'Fixes: QW-52' (обязательно)\n\
-          3. Между ними может быть любой текст (игнорируется)"
+          3. Между ними может быть любой текст"
 
-          # Получаем диапазон коммитов для проверки
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             BASE_SHA=$(git rev-parse $GITHUB_REF~1)
             HEAD_SHA=$(git rev-parse $GITHUB_SHA)
@@ -31,7 +29,6 @@ jobs:
             HEAD_SHA=$(git rev-parse $GITHUB_HEAD_REF)
           fi
 
-          # Проверяем каждый коммит
           git log --format=%B $BASE_SHA..$HEAD_SHA | awk -v RS= -v FS="\n" '{
             header = $1
             footer = $NF
