@@ -11,15 +11,21 @@ jobs:
 
       - name: Validate commit messages
         run: |
-          PATTERN='^(chore|docs|feat|fix|refactor|revert|style|test)(\([a-z-]+\))?: [a-zA-Z].+(\n\n.*)?(\n\nFixes: [A-Z]+-[0-9]+)?$'
-          ERROR_MSG="❌ Invalid commit format! Пример правильного формата:\n\
-          fix(ui): Correct button alignment\n\n\
-          Buttons were misaligned in mobile view\n\n\
+          PATTERN='^(chore|docs|feat|fix|refactor|revert|style|test)(\([a-z-]+\))?: [a-zA-Z].+$'
+          BODY_PATTERN='(\n\n.*)?'
+          FOOTER_PATTERN='(\n\nFixes: [A-Z]+-[0-9]+)?$'
+          FULL_PATTERN="${PATTERN}${BODY_PATTERN}${FOOTER_PATTERN}"
+          
+          ERROR_MSG="❌ Invalid commit format! Примеры:\n\
+          fix: add new feature\n\
+          или\n\
+          fix(ui): Add new feature\n\n\
+          Описание изменений (опционально)\n\n\
           Fixes: QW-52\n\n\
-          Ваш коммит должен:\n\
-          - Начинаться с типа (feat, fix и др.)\n\
-          - Субъект начинать с заглавной буквы\n\
-          - Указать задачу в формате 'Fixes: QW-52'"
+          Требования:\n\
+          - Тип (feat, fix и др.)\n\
+          - Описание после двоеточия\n\
+          - Задача в формате 'Fixes: QW-52' (обязательно)"
           
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             BASE_SHA=$(git rev-parse $GITHUB_REF~1)
@@ -29,10 +35,10 @@ jobs:
             HEAD_SHA=$(git rev-parse $GITHUB_HEAD_REF)
           fi
 
-          git log --format=%B $BASE_SHA..$HEAD_SHA | awk 'BEGIN{RS=""; FS="\n"} {print $1; print $2; print $3}' | while read -r line; do
-            if [ -n "$line" ] && [[ ! "$line" =~ ^# ]] && [[ ! "$line" =~ ^$PATTERN ]]; then
+          git log --format=%B $BASE_SHA..$HEAD_SHA | while IFS= read -r line; do
+            if [ -n "$line" ] && [[ ! "$line" =~ ^# ]] && [[ ! "${line}" =~ ${FULL_PATTERN} ]]; then
               echo -e "$ERROR_MSG"
-              echo -e "\nНайден невалидный коммит:\n$line"
+              echo -e "\nНайден невалидный коммит:\n---\n${line}\n---"
               exit 1
             fi
           done
