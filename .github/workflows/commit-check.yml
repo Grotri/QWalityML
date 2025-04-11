@@ -11,34 +11,42 @@ jobs:
 
       - name: Validate commit messages
         run: |
-          TYPES="build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test"
-          HEADER_PATTERN="^($TYPES)(\([a-z-]+\))?: .+"
-          FOOTER_PATTERN="^Fixes: [A-Z]+-[0-9]+$"
-          
-          ERROR_MSG="❌ Неверный формат коммита! Требования:
-          1. Первая строка: <тип>(<область>): <описание>
-             Пример: 'fix: исправить баг' или 'feat(api): добавить метод'
-             Допускается: 'fix: fix regex'
-          2. Последняя строка: 'Fixes: QW-52' (обязательно)
-          3. Между ними может быть любой текст (игнорируется)"
+          check_commit() {
+            local commit=$1
+            
+            local first_line=$(echo "$commit" | grep -m 1 -v '^$')
+            
+            local last_line=$(echo "$commit" | tail -n 1 | grep -v '^$')
+            
+            if ! echo "$first_line" | grep -qE '^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z-]+\))?: .+'; then
+              return 1
+            fi
+            
+            if ! echo "$last_line" | grep -qE '^Fixes: [A-Z]+-[0-9]+$'; then
+              return 1
+            fi
+            
+            return 0
+          }
 
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
-            COMMITS=$(git log --format=%B $GITHUB_REF~1..$GITHUB_SHA)
+            COMMITS_RANGE="$GITHUB_REF~1..$GITHUB_SHA"
           else
-            COMMITS=$(git log --format=%B $GITHUB_BASE_REF..$GITHUB_HEAD_REF)
+            COMMITS_RANGE="$GITHUB_BASE_REF..$GITHUB_HEAD_REF"
           fi
 
-          while read -r -d '' commit; do
-            first_line=$(echo "$commit" | head -n 1 | grep -v '^$')
-            last_line=$(echo "$commit" | tail -n 1 | grep -v '^$')
-            
-            # Проверяем условия
-            if ! [[ "$first_line" =~ $HEADER_PATTERN ]] || ! [[ "$last_line" =~ $FOOTER_PATTERN ]]; then
+          git log --format=%B $COMMITS_RANGE | awk -v RS='' '{print}' | while read -r commit; do
+            if ! check_commit "$commit"; then
               echo "❌ Ошибка в коммите:"
               echo "---"
               echo "$commit"
               echo "---"
-              echo "$ERROR_MSG"
+              echo "❌ Неверный формат коммита! Требования:"
+              echo "1. Первая строка: <тип>(<область>): <описание>"
+              echo "   Пример: 'fix: исправить баг' или 'feat(api): добавить метод'"
+              echo "   Допускается: 'fix: fix regex'"
+              echo "2. Последняя строка: 'Fixes: QW-52' (обязательно)"
+              echo "3. Между ними может быть любой текст"
               exit 1
             fi
-          done < <(echo "$COMMITS" | awk -v RS='\n\n' -v ORS='\0' '1')
+          done
