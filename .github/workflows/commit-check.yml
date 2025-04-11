@@ -11,22 +11,22 @@ jobs:
 
       - name: Validate commit messages
         run: |
-          PATTERN='^(chore|docs|feat|fix|refactor|revert|style|test)(\([a-z-]+\))?: [a-zA-Z].+$'
-          BODY_PATTERN='(\n\n.*)?'
-          FOOTER_PATTERN='(\n\nFixes: [A-Z]+-[0-9]+)?$'
-          FULL_PATTERN="${PATTERN}${BODY_PATTERN}${FOOTER_PATTERN}"
+          HEADER_PATTERN='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z-]+\))?: [a-zA-Z].+'
+          FULL_PATTERN="${HEADER_PATTERN}(\n\n.*)?(\n\nFixes: [A-Z]+-[0-9]+)?$"
           
-          ERROR_MSG="❌ Invalid commit format! Примеры:\n\
-          fix: add new feature\n\
-          или\n\
-          fix(ui): Add new feature\n\n\
-          Описание изменений (опционально)\n\n\
+          ERROR_MSG="❌ Неверный формат коммита! Примеры:\n\
+          fix: исправить проверку коммитов\n\n\
           Fixes: QW-52\n\n\
+          ИЛИ\n\
+          feat(api): добавить новую функцию\n\n\
+          Подробное описание изменений\n\n\
+          Fixes: QW-53\n\n\
           Требования:\n\
           - Тип (feat, fix и др.)\n\
           - Описание после двоеточия\n\
-          - Задача в формате 'Fixes: QW-52' (обязательно)"
-          
+          - 'Fixes: QW-XX' в конце (обязательно)"
+
+          # Получаем диапазон коммитов для проверки
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             BASE_SHA=$(git rev-parse $GITHUB_REF~1)
             HEAD_SHA=$(git rev-parse $GITHUB_SHA)
@@ -35,10 +35,11 @@ jobs:
             HEAD_SHA=$(git rev-parse $GITHUB_HEAD_REF)
           fi
 
-          git log --format=%B $BASE_SHA..$HEAD_SHA | while IFS= read -r line; do
-            if [ -n "$line" ] && [[ ! "$line" =~ ^# ]] && [[ ! "${line}" =~ ${FULL_PATTERN} ]]; then
+          # Проверяем каждый коммит целиком
+          git log --format=%B $BASE_SHA..$HEAD_SHA | awk -v RS= '{print}' | while read -r commit; do
+            if [[ ! "$commit" =~ $FULL_PATTERN ]]; then
               echo -e "$ERROR_MSG"
-              echo -e "\nНайден невалидный коммит:\n---\n${line}\n---"
+              echo -e "\nОшибка в коммите:\n---\n$commit\n---"
               exit 1
             fi
           done
