@@ -1,7 +1,5 @@
-name: Conventional Commits Check (All Branches)
-on:
-  push:
-  pull_request:
+name: Conventional Commits Check
+on: [push, pull_request]
 
 jobs:
   check-commits:
@@ -13,21 +11,28 @@ jobs:
 
       - name: Validate commit messages
         run: |
-          PATTERN='^(chore|docs|feat|fix|refactor|revert|style|test)(\([a-z-]+\))?: [A-Z][a-zA-Z0-9 -]+(\n\n.*)?(\n\nFixes: [A-Z]+-[0-9]+)?$'
-          ERROR_MSG="❌ Invalid commit format! Use:\n<type>(<scope>): <Subject>\n\n<body>\n\nFixes: TASK-123\n\nПример:\nfix(login): Resolve 500 error\n\nFixes: QW-45"
+          PATTERN='^(chore|docs|feat|fix|refactor|revert|style|test)(\([a-z-]+\))?: [a-zA-Z].+(\n\n.*)?(\n\nFixes: [A-Z]+-[0-9]+)?$'
+          ERROR_MSG="❌ Invalid commit format! Пример правильного формата:\n\
+          fix(ui): Correct button alignment\n\n\
+          Buttons were misaligned in mobile view\n\n\
+          Fixes: QW-52\n\n\
+          Ваш коммит должен:\n\
+          - Начинаться с типа (feat, fix и др.)\n\
+          - Субъект начинать с заглавной буквы\n\
+          - Указать задачу в формате 'Fixes: QW-52'"
           
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             BASE_SHA=$(git rev-parse $GITHUB_REF~1)
             HEAD_SHA=$(git rev-parse $GITHUB_SHA)
-          elif [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+          else
             BASE_SHA=$(git rev-parse $GITHUB_BASE_REF)
             HEAD_SHA=$(git rev-parse $GITHUB_HEAD_REF)
           fi
 
-          git log --format=%B $BASE_SHA..$HEAD_SHA | while read -r line; do
+          git log --format=%B $BASE_SHA..$HEAD_SHA | awk 'BEGIN{RS=""; FS="\n"} {print $1; print $2; print $3}' | while read -r line; do
             if [ -n "$line" ] && [[ ! "$line" =~ ^# ]] && [[ ! "$line" =~ ^$PATTERN ]]; then
               echo -e "$ERROR_MSG"
-              echo "Found invalid commit: $line"
+              echo -e "\nНайден невалидный коммит:\n$line"
               exit 1
             fi
           done
