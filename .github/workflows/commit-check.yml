@@ -11,33 +11,34 @@ jobs:
 
       - name: Validate commit messages
         run: |
-          HEADER_PATTERN='^(chore|docs|feat|fix|refactor|revert|style|test)(\([a-z-]+\))?: .+'
-          FOOTER_PATTERN='^Fixes: [A-Z]+-[0-9]+$'
+          TYPES="build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test"
+          HEADER_PATTERN="^($TYPES)(\([a-z-]+\))?: .+"
+          FOOTER_PATTERN="^Fixes: [A-Z]+-[0-9]+$"
           
-          ERROR_MSG="❌ Неверный формат коммита! Требования:\n\
-          1. Первая строка: <тип>(<область>): <описание>\n\
-             Пример: 'fix: исправить баг' или 'feat(api): добавить метод'\n\
-             Допускается: 'fix: fix typo'\n\
-          2. Последняя строка: 'Fixes: QW-52' (обязательно)\n\
-          3. Между ними может быть любой текст"
+          ERROR_MSG="❌ Неверный формат коммита! Требования:
+          1. Первая строка: <тип>(<область>): <описание>
+             Пример: 'fix: исправить баг' или 'feat(api): добавить метод'
+             Допускается: 'fix: fix regex'
+          2. Последняя строка: 'Fixes: QW-52' (обязательно)
+          3. Между ними может быть любой текст (игнорируется)"
 
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
-            BASE_SHA=$(git rev-parse $GITHUB_REF~1)
-            HEAD_SHA=$(git rev-parse $GITHUB_SHA)
+            COMMITS=$(git log --format=%B $GITHUB_REF~1..$GITHUB_SHA)
           else
-            BASE_SHA=$(git rev-parse $GITHUB_BASE_REF)
-            HEAD_SHA=$(git rev-parse $GITHUB_HEAD_REF)
+            COMMITS=$(git log --format=%B $GITHUB_BASE_REF..$GITHUB_HEAD_REF)
           fi
 
-          git log --format=%B $BASE_SHA..$HEAD_SHA | awk -v RS= -v FS="\n" '{
-            header = $1
-            footer = $NF
-            if (header !~ /'"$HEADER_PATTERN"'/ || footer !~ /'"$FOOTER_PATTERN"'/) {
-              print "❌ Ошибка в коммите:"
-              print "---"
-              print $0
-              print "---"
-              print "'"$ERROR_MSG"'"
+          while read -r -d '' commit; do
+            first_line=$(echo "$commit" | head -n 1 | grep -v '^$')
+            last_line=$(echo "$commit" | tail -n 1 | grep -v '^$')
+            
+            # Проверяем условия
+            if ! [[ "$first_line" =~ $HEADER_PATTERN ]] || ! [[ "$last_line" =~ $FOOTER_PATTERN ]]; then
+              echo "❌ Ошибка в коммите:"
+              echo "---"
+              echo "$commit"
+              echo "---"
+              echo "$ERROR_MSG"
               exit 1
-            }
-          }'
+            fi
+          done < <(echo "$COMMITS" | awk -v RS='\n\n' -v ORS='\0' '1')
