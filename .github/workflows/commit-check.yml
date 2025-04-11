@@ -11,20 +11,16 @@ jobs:
 
       - name: Validate commit messages
         run: |
-          HEADER_PATTERN='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z-]+\))?: [a-zA-Z].+'
-          FULL_PATTERN="${HEADER_PATTERN}(\n\n.*)?(\n\nFixes: [A-Z]+-[0-9]+)?$"
+          # Паттерн для первой строки
+          HEADER_PATTERN='^(chore|docs|feat|fix|refactor|revert|style|test)(\([a-z-]+\))?: [a-zA-Z].+'
+          # Паттерн для последней строки
+          FOOTER_PATTERN='Fixes: [A-Z]+-[0-9]+$'
           
-          ERROR_MSG="❌ Неверный формат коммита! Примеры:\n\
-          fix: исправить проверку коммитов\n\n\
-          Fixes: QW-52\n\n\
-          ИЛИ\n\
-          feat(api): добавить новую функцию\n\n\
-          Подробное описание изменений\n\n\
-          Fixes: QW-53\n\n\
-          Требования:\n\
-          - Тип (feat, fix и др.)\n\
-          - Описание после двоеточия\n\
-          - 'Fixes: QW-XX' в конце (обязательно)"
+          ERROR_MSG="❌ Неверный формат коммита! Требования:\n\
+          1. Первая строка: <тип>(<область>): <описание>\n\
+             Пример: 'fix: исправить баг' или 'feat(api): добавить метод'\n\
+          2. Последняя строка: 'Fixes: QW-52' (обязательно)\n\
+          3. Между ними может быть любой текст (игнорируется)"
 
           # Получаем диапазон коммитов для проверки
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
@@ -35,11 +31,16 @@ jobs:
             HEAD_SHA=$(git rev-parse $GITHUB_HEAD_REF)
           fi
 
-          # Проверяем каждый коммит целиком
-          git log --format=%B $BASE_SHA..$HEAD_SHA | awk -v RS= '{print}' | while read -r commit; do
-            if [[ ! "$commit" =~ $FULL_PATTERN ]]; then
-              echo -e "$ERROR_MSG"
-              echo -e "\nОшибка в коммите:\n---\n$commit\n---"
+          # Проверяем каждый коммит
+          git log --format=%B $BASE_SHA..$HEAD_SHA | awk -v RS= -v FS="\n" '{
+            header = $1
+            footer = $NF
+            if (header !~ /'"$HEADER_PATTERN"'/ || footer !~ /'"$FOOTER_PATTERN"'/) {
+              print "❌ Ошибка в коммите:"
+              print "---"
+              print $0
+              print "---"
+              print "'"$ERROR_MSG"'"
               exit 1
-            fi
-          done
+            }
+          }'
