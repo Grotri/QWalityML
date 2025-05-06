@@ -1,0 +1,9 @@
+names:
+  0: scratch
+  1: crack
+  2: shunt
+  3: breakdown
+  4: degradation
+path: C:\Users\user\PycharmProjects\dataset_builder\output
+train: images/train
+val: images/val
